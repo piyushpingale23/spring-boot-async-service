@@ -2,13 +2,17 @@
 
 #URL="http://localhost:3001/hello"
 #URL="http://localhost:3001/products-sync"
-URL="http://localhost:3001/products-async"
+#URL="http://localhost:3001/products-async"
+#URL="http://localhost:3001/products-chained-sync"
+#URL="http://localhost:3001/products-chained-async"
+URL="http://localhost:3001/simulate-memory-leak"
 
 START_TIME=$(date +%s%N)
 
-for i in {1..100}
+for i in {1..1000}
 do
     curl -s "$URL" > /dev/null &
+    sleep 1
 done
 
 wait

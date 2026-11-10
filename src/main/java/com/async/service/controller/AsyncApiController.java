@@ -3,15 +3,21 @@ package com.async.service.controller;
 import com.async.service.entity.ProductsResult;
 import com.async.service.service.AsyncApiService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
-public class HelloController {
+public class AsyncApiController {
 
     @Autowired
     AsyncApiService asyncApiService;
+
+    List<byte[]> bytesStored = new ArrayList<>();
 
     // This API is blocking in nature.
     // Thread.sleep(1000) blocks/occupies the Tomcat worker thread for ~1 second.
@@ -41,7 +47,7 @@ public class HelloController {
 
     // API invocation in an API
     // 2 Ways -> Synchronously - RestTemplate
-    //           Asynchronously - testTemplate and Webclient
+    //           Asynchronously - RestTemplate and Webclient
 
     // http://localhost:3001/hello2
     @GetMapping("hello2")
@@ -101,4 +107,95 @@ public class HelloController {
         return asyncApiService.fetchProductsASync();
     }
 
+    // http://localhost:3001/products-async-parallel-all
+    // Parallel API invocation:
+    // Multiple downstream APIs are started concurrently instead of waiting
+    // for one API to complete before starting the next.
+    //
+    // Mono<List<ProductsResult>> represents a result that will be available later.
+    // The List contains the combined results from all parallel API calls.
+    //
+    // Key concept:
+    // Sequential -> API-1 completes -> API-2 starts -> API-3 starts.
+    // Parallel   -> API-1, API-2 and API-3 are started concurrently.
+    //
+    // Since this method represents "parallel-all":
+    // - If ALL downstream APIs succeed -> combined results are returned.
+    // - If ANY downstream API fails -> the overall Mono fails and the final
+    //   response is not returned as a successful combined result.
+    //
+    // The controller thread is not blocked while waiting for the downstream
+    // API responses. It returns the Mono to the WebFlux runtime, which completes
+    // the HTTP response when all parallel operations are finished.
+    @GetMapping("products-async-parallel-all")
+    public Mono<List<ProductsResult>> fetchProductsASyncParallelAll() {
+
+        // Thread handling the initial HTTP request.
+        System.out.println("fetchProductsASyncParallelAll Controller : " + Thread.currentThread().getName());
+
+        // Starts multiple downstream API calls in parallel.
+        // The Mono completes only after all API calls successfully complete.
+        return asyncApiService.fetchProductsASyncParallelAll();
+    }
+
+    // http://localhost:3001/products-async-parallel-fastest
+    @GetMapping("products-async-parallel-fastest")
+    public Mono<ProductsResult> fetchProductsASyncParallelFastest() {
+
+        // Thread handling the initial HTTP request.
+        System.out.println("fetchProductsASyncParallelFastest Controller : " + Thread.currentThread().getName());
+
+        // Starts multiple downstream API calls in parallel.
+        // The Mono completes only after all API calls successfully complete.
+        return asyncApiService.fetchProductsASyncParallelFastest();
+    }
+
+    // http://localhost:3001/products-chained-sync
+    @GetMapping("products-chained-sync")
+    public List<ProductsResult> fetchProductsChainedSync() {
+
+        // Thread handling the initial HTTP request.
+        System.out.println("fetchProductsChainedSync Controller : " + Thread.currentThread().getName());
+
+        return asyncApiService.fetchProductsChainedSync();
+    }
+
+    // http://localhost:3001/products-chained-async
+    @GetMapping("products-chained-async")
+    public Mono<List<ProductsResult>> fetchProductsChainedASync() {
+
+        // Thread handling the initial HTTP request.
+        System.out.println("fetchProductsChainedASync Controller : " + Thread.currentThread().getName());
+
+        return asyncApiService.fetchProductsChainedASync();
+    }
+
+    // curl -N http://localhost:3001/products-flux-stream
+    @GetMapping(value = "products-flux-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ProductsResult> getProductsFluxStream() {
+
+        // Thread handling the initial HTTP request.
+        System.out.println("getProductsFluxStream Controller : " + Thread.currentThread().getName());
+
+        return asyncApiService.getProductsFluxStream();
+    }
+
+    @GetMapping("simulate-memory-leak")
+    public String simulateMemoryLeak() {
+
+        // Allocate 10 MB
+        byte[] temp = new byte[10 * 1024 * 1024];
+
+        // Prevent GC by storing the reference
+        bytesStored.add(temp);
+
+        int chunkCount = bytesStored.size();
+        long totalMemoryMB = chunkCount * 10L;
+
+        String message = String.format("Memory Leak Simulated | Chunks Stored: %d | Memory Leaked: %d MB", chunkCount, totalMemoryMB);
+
+        System.out.println(message);
+
+        return message;
+    }
 }
